@@ -280,10 +280,10 @@ def change_mihoyo(game: str, link=False):
         create_links("mihoyo")
 
 def get_file():
-    if os.path.isfile(__file__):
-        return __file__
+    if os.path.isfile(os.path.abspath(__file__)):
+        return os.path.abspath(__file__)
     else:
-        return __file__.replace('.py', '.exe')
+        return os.path.abspath(__file__).replace('.py', '.exe')
 
 def command_mode(game_path, launcher_path):
     commands_dict = {"1": lambda: change_bilibili(game_path, link=True), 
@@ -323,6 +323,7 @@ def main():
     title("鸭皇·游戏")
     print("《原神》游戏管理工具")
     print(f"工具版本：{__version__}")
+    print(f"文件所在目录: {os.path.dirname(os.path.abspath(__file__))}")
     print("by 鸭皇游戏")
     if "launcher_path" not in config.read() and "game_path" not in config.read():
         set_path()
