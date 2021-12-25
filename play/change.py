@@ -9,7 +9,7 @@ import configparser
 
 from pickleshare import PickleShareDB
 
-__version__ = "1.0"
+__version__ = "2.0"
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 shell = client.Dispatch("WScript.Shell")
@@ -77,23 +77,108 @@ def search_dir(file_name, disks: list = None, assert_file=None):
     print(f"寻找完成，一共{total}个文件")
     return None
 
-def search_path(file_name: str, path: str = "C:/", assert_file=None):
-    print()
-    cp = os.walk(path)
-    total = 0
-    count = 0
-    for root, dirs, files in cp:
-        root = str(root)
-        dirs = str(dirs)
-        count += 1
-        total += 1
-        if file_name in dirs or file_name in files:
-            flag = 1
-            if assert_file in os.listdir(root) and "$Recycle.Bin" not in os.path.join(root, file_name):
-                return os.path.join(root, file_name)
-    print("\n")
-    print(f"寻找完成，一共{total}个文件")
-    return None
+# 旧版本搜索
+#
+#
+# def search_path(file_name: str, path: str = "C:/", assert_file=None):
+#     print()
+#     cp = os.walk(path)
+#     total = 0
+#     count = 0
+#     for root, dirs, files in cp:
+#         root = str(root)
+#         dirs = str(dirs)
+#         count += 1
+#         total += 1
+#         if file_name in dirs or file_name in files:
+#             flag = 1
+#             if assert_file in os.listdir(root) and "$Recycle.Bin" not in os.path.join(root, file_name):
+#                 return os.path.join(root, file_name)
+#     print("\n")
+#     print(f"寻找完成，一共{total}个文件")
+#     return None
+
+
+def search_path(search_path, file_type="file", filename=None, file_startswith=None, file_endswith=None, abspath=False) -> dict:
+    """
+    查找指定目录下所有的文件（不包含以__开头和结尾的文件）或指定格式的文件，若不同目录存在相同文件名，只返回第1个文件的路径
+    :param search_path: 查找的目录路径
+    :param file_type: 查找的类型，可缺省，缺省则默认查找文件类型，可输入值：file和dir,file表示文件,dir表示目录
+    :param filename: 查找名称，精确匹配，可缺省，缺省则返回所有文件或目录，不可与file_startswith或file_endswith组合使用
+    :param file_startswith: 模糊匹配开头，可缺省，缺省则不匹配,可与file_endswith组合使用
+    :param file_endswith:  模糊匹配结尾，可缺省，缺省则不匹配
+    :param abspath: 是否返回绝对路径，默认返回相对路径
+    :return: 有结果返回dict类型，key为文件名，value为文件路径，无结果返None
+    """
+    filename_path = {}
+    the_filename_path = {}
+
+    if abspath:
+        search_path = os.path.abspath(search_path)
+
+    if file_type not in ["file", "dir"]:
+        raise ValueError(f"file_type只能为file或dir，而输入值为{file_type}")
+
+    def __find_file(_search_path):
+        # 返回目录所有名称
+        names = os.listdir(_search_path)
+        find_flag = False
+
+        # 如果查找指定文件，找到就停止查找
+        if filename is not None and (filename in names):
+            path = os.path.join(_search_path, filename)
+            if file_type == "file" and os.path.isfile(path):
+                the_filename_path.setdefault(filename, path)
+                find_flag = True
+            elif file_type == "dir" and os.path.isdir(path):
+                the_filename_path.setdefault(filename, path)
+                find_flag = True
+            return find_flag
+
+        # 如果根目录未找到，在子目录继续查找
+        for name in names:
+            # 过滤以__开头和__结尾的目录，以及__init__.py文件
+            if name.startswith("__") and name.endswith("__") or name == "__init__.py":
+                continue
+
+            child_path = os.path.join(_search_path, name)
+
+            # 如果是文件就保存
+            if file_type == "file" and os.path.isfile(child_path):
+                if file_startswith is None and file_endswith is None:
+                    filename_path.setdefault(name, child_path)
+                # 保存指定结尾的文件
+                elif file_startswith is not None and file_endswith is None and name.startswith(file_startswith):
+                    filename_path.setdefault(name, child_path)
+                elif file_startswith is None and file_endswith is not None and name.endswith(file_endswith):
+                    filename_path.setdefault(name, child_path)
+                elif file_startswith is not None and file_endswith is not None and name.startswith(file_startswith) and name.endswith(file_endswith):
+                    filename_path.setdefault(name, child_path)
+                continue
+            if os.path.isdir(child_path):
+                if file_type == "dir":
+                    if file_startswith is None and file_endswith is None:
+                        filename_path.setdefault(name, child_path)
+                    # 保存指定结尾的文件
+                    elif file_startswith is not None and file_endswith is None and name.startswith(file_startswith):
+                        filename_path.setdefault(name, child_path)
+                    elif file_startswith is None and file_endswith is not None and name.endswith(file_endswith):
+                        filename_path.setdefault(name, child_path)
+                    elif file_startswith is not None and file_endswith is not None and name.startswith(file_startswith) and name.endswith(file_endswith):
+                        filename_path.setdefault(name, child_path)
+
+                _result = __find_file(child_path)
+                if _result is True:
+                    return _result
+
+    result = __find_file(search_path)
+    if filename is None:
+        if filename_path:
+            return filename_path
+
+    if filename is not None:
+        if result is True:
+            return the_filename_path
 
 def read_argvs():
     parser = argparse.ArgumentParser(get_file().replace('\\', '/').split("/")[-1])
@@ -108,21 +193,37 @@ config = Setting("base_config")
 
 def set_path():
     print("尝试检测游戏目录")
-    ys_launcher = search_dir("launcher.exe", assert_file="7z.exe")
+    try:
+        ys_launcher = search_dir("launcher.exe", assert_file="7z.exe")
+    except KeyboardInterrupt:
+        print("用户停止了搜索")
+        pause()
+        sys.exit()
     if not ys_launcher:
         print("启动器不存在")
         pause()
         sys.exit()
     print(ys_launcher)
     print("尝试寻找《原神》游戏")
-    ys_game = search_path("YuanShen.exe", os.path.dirname(os.path.abspath(ys_launcher)))
+    try:
+        ys_game = search_path(os.path.dirname(os.path.abspath(ys_launcher)), filename="YuanShen.exe")
+    except KeyboardInterrupt:
+        print("用户停止了搜索")
+        pause()
+        sys.exit()
     if not ys_game:
         print("尝试启动备用寻找方案")
-        ys_game = search_dir("YuanShen.exe", assert_file="UnityPlayer.dll")
+        try:
+            ys_game = search_dir("YuanShen.exe", assert_file="UnityPlayer.dll")
+        except KeyboardInterrupt:
+            print("用户停止了搜索")
+            pause()
+            sys.exit()
         if not ys_game:
             print("未找到游戏")
             pause()
             sys.exit()
+    ys_game = list(ys_game.values())[0]
     config.add("launcher_path", ys_launcher)
     config.add("game_path", ys_game)
 
@@ -140,6 +241,22 @@ def change_bilibili(game: str, link=False):
     print("切换成功")
     if link:
         create_links("bilibili")
+
+def get_game_version(game: str):
+    ys_config = configparser.ConfigParser()
+    game_config = os.path.join(os.path.dirname(game), "config.ini")
+    ys_config.read(game_config)
+    for item in ys_config.items("General"):
+        if item[0] == "game_version":
+            return item[1]
+
+def get_mihoyo_sdk_version(game: str):
+    ys_config = configparser.ConfigParser()
+    game_config = os.path.join(os.path.dirname(game), "config.ini")
+    ys_config.read(game_config)
+    for item in ys_config.items("General"):
+        if item[0] == "sdk_version":
+            return item[1]
 
 def is_admin():
     try:
@@ -173,14 +290,16 @@ def command_mode(game_path, launcher_path):
             "2": lambda: change_mihoyo(game_path, link=True), 
             "3": lambda: os.system("\"" + launcher_path + "\""),
             "4": create_links, 
-            "5": sys.exit
+            "5": set_path,
+            "6": sys.exit
             }
     print("指令：")
     print("1. 切换到Bilibili服务器")
     print("2. 切换到miHoYo服务器")
     print("3. 启动游戏")
     print("4. 创建快捷方式（全部渠道服）")
-    print("5. 退出")
+    print("5. 重新查找游戏")
+    print("6. 退出")
     while True:
         res = input("请输入功能序号：")
         if res not in commands_dict:
@@ -203,14 +322,21 @@ def create_links(mode="all"):
 def main():
     title("鸭皇·游戏")
     print("《原神》游戏管理工具")
-    print(f"版本：{__version__}")
+    print(f"工具版本：{__version__}")
     print("by 鸭皇游戏")
     if "launcher_path" not in config.read() and "game_path" not in config.read():
         set_path()
 
     launcher_path = config.read("launcher_path")
     game_path = config.read("game_path")
+    if (not os.path.isfile(launcher_path)) or (not os.path.isfile(game_path)):
+        print("游戏不存在，尝试寻找")
+        set_path()
+    launcher_path = config.read("launcher_path")
+    game_path = config.read("game_path")
     print(f"启动器: {launcher_path}\n游戏: {game_path}")
+    print(f"游戏版本:  {get_game_version(game_path)}")
+    print(f"米哈游SDK版本：{get_mihoyo_sdk_version(game_path)}")
 
     argv = read_argvs()
     if argv.mihoyo:
