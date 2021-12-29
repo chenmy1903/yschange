@@ -9,10 +9,16 @@ import configparser
 
 from pickleshare import PickleShareDB
 
-__version__ = "2.0"
+__version__ = "3.0"
+list_of_argv_configs = [
+    "no_launcher",
+]
+false = "False"
+true = "True"
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 shell = client.Dispatch("WScript.Shell")
+
 
 class Setting:
     def __init__(self, file_name, config={}, config_path="~/.duck_game/ys/"):
@@ -25,9 +31,14 @@ class Setting:
     def add(self, key, value):
         """添加新值"""
         new = self.db[self.file_name]
-        if value:
-            new[key] = value
-            self.db[self.file_name] = new
+        new[key] = value
+        self.db[self.file_name] = new
+
+    def delete(self, key):
+        """删除值"""
+        config = self.db[self.file_name]
+        del config[key]
+        self.db[self.file_name] = config
 
     def read(self, config=None):
         """读文件"""
@@ -36,16 +47,29 @@ class Setting:
         return self.db[self.file_name]
 
 
+class ConfigNotFoundError(Exception):
+    """设置不存在引发的错误"""
+
+    pass
+
+class ConfigTypeError(Exception):
+    """设置类型错误引发的错误"""
+
+    pass
+
+
 def createShortCut(filename, lnkname, commands: list = None):
     shortcut = shell.CreateShortCut(lnkname)
-    shortcut.TargetPath = filename 
+    shortcut.TargetPath = filename
     if commands:
         shortcut.Arguments = " ".join(commands)
     shortcut.WorkingDirectory = os.path.dirname(filename)
     shortcut.save()
 
+
 def title(text: str):
     os.system(f"title {text}")
+
 
 def pause(text=None, function=None):
     if text:
@@ -54,10 +78,12 @@ def pause(text=None, function=None):
     if function:
         function()
 
+
 def search_dir(file_name, disks: list = None, assert_file=None):
     print()
     w = wmi.WMI()
-    disks = [disk.Caption for disk in w.Win32_LogicalDisk(DriveType=3)] if not disks else disks
+    disks = [disk.Caption for disk in w.Win32_LogicalDisk(
+        DriveType=3)] if not disks else disks
     total = 0
     print(f"总共有{len(disks)}个磁盘，准备扫描")
     for disk in disks:
@@ -180,16 +206,24 @@ def search_path(search_path, file_type="file", filename=None, file_startswith=No
         if result is True:
             return the_filename_path
 
+
 def read_argvs():
-    parser = argparse.ArgumentParser(get_file().replace('\\', '/').split("/")[-1])
+    parser = argparse.ArgumentParser(
+        get_file().replace('\\', '/').split("/")[-1])
     parser.add_argument("--path", help="重新设置启动器目录", action='store_true')
-    parser.add_argument("--bilibili", help="使用bilibili服务器启动", action='store_true')
+    parser.add_argument(
+        "--bilibili", help="使用bilibili服务器启动", action='store_true')
     parser.add_argument("--mihoyo", help="使用米哈游服务器启动", action='store_true')
-    parser.add_argument("--change", help="设置服务器（bilibili：哔哩哔哩，mihoyou：米哈游，不区分大小写） 例： --change bilibili 切换到bilibili服务器")
+    parser.add_argument(
+        "--change", help="设置服务器（bilibili：哔哩哔哩，mihoyou：米哈游，不区分大小写） 例： --change bilibili 切换到bilibili服务器")
     parser.add_argument("--link", help="生成所有服务器的快捷方式", action='store_true')
+    parser.add_argument(
+        "--config", help="调整一些配置，API详细用法见https://chenmy1903.github.io/yschange/", metavar="N", nargs='+')
     return parser.parse_args()
 
+
 config = Setting("base_config")
+
 
 def set_path():
     print("尝试检测游戏目录")
@@ -206,7 +240,8 @@ def set_path():
     print(ys_launcher)
     print("尝试寻找《原神》游戏")
     try:
-        ys_game = search_path(os.path.dirname(os.path.abspath(ys_launcher)), filename="YuanShen.exe")
+        ys_game = search_path(os.path.dirname(
+            os.path.abspath(ys_launcher)), filename="YuanShen.exe")
     except KeyboardInterrupt:
         print("用户停止了搜索")
         pause()
@@ -227,6 +262,7 @@ def set_path():
     config.add("launcher_path", ys_launcher)
     config.add("game_path", ys_game)
 
+
 def change_bilibili(game: str, link=False):
     print("尝试切换bilibili服务器")
     ys_config = configparser.ConfigParser()
@@ -242,6 +278,7 @@ def change_bilibili(game: str, link=False):
     if link:
         create_links("bilibili")
 
+
 def get_game_version(game: str):
     ys_config = configparser.ConfigParser()
     game_config = os.path.join(os.path.dirname(game), "config.ini")
@@ -249,6 +286,7 @@ def get_game_version(game: str):
     for item in ys_config.items("General"):
         if item[0] == "game_version":
             return item[1]
+
 
 def get_mihoyo_sdk_version(game: str):
     ys_config = configparser.ConfigParser()
@@ -258,11 +296,13 @@ def get_mihoyo_sdk_version(game: str):
         if item[0] == "sdk_version":
             return item[1]
 
+
 def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
         return False
+
 
 def change_mihoyo(game: str, link=False):
     print("尝试切换miHoYo服务器")
@@ -276,8 +316,19 @@ def change_mihoyo(game: str, link=False):
     with open(game_config, 'w') as f:
         ys_config.write(f)
     print("切换成功")
-    if link: 
+    if link:
         create_links("mihoyo")
+
+def start_launcher(launcher_path, game_path):
+    unity_run = config.read("no_launcher") == true if "no_launcher"  in config.read() else False
+    print(unity_run)
+    if unity_run:
+        os.system(f"\"{game_path}\"")
+    else:
+        os.system(f"\"{launcher_path}\"")
+    sys.exit()
+
+
 
 def get_file():
     if os.path.isfile(os.path.abspath(__file__)):
@@ -285,14 +336,15 @@ def get_file():
     else:
         return os.path.abspath(__file__).replace('.py', '.exe')
 
+
 def command_mode(game_path, launcher_path):
-    commands_dict = {"1": lambda: change_bilibili(game_path, link=True), 
-            "2": lambda: change_mihoyo(game_path, link=True), 
-            "3": lambda: os.system("\"" + launcher_path + "\""),
-            "4": create_links, 
-            "5": set_path,
-            "6": sys.exit
-            }
+    commands_dict = {"1": lambda: change_bilibili(game_path, link=True),
+                     "2": lambda: change_mihoyo(game_path, link=True),
+                     "3": lambda: os.system("\"" + launcher_path + "\""),
+                     "4": create_links,
+                     "5": set_path,
+                     "6": sys.exit
+                     }
     print("指令：")
     print("1. 切换到Bilibili服务器")
     print("2. 切换到miHoYo服务器")
@@ -308,21 +360,43 @@ def command_mode(game_path, launcher_path):
             break
     commands_dict[res]()
 
+
 def create_links(mode="all"):
     if mode == "all":
-        createShortCut(get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [BiliBili世界树].lnk", ["--bilibili"])
-        createShortCut(get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [miHoYo天空岛].lnk", ["--mihoyo"])
+        createShortCut(get_file(
+        ), f"{os.path.expanduser('~')}/Desktop/原神 [BiliBili世界树].lnk", ["--bilibili"])
+        createShortCut(
+            get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [miHoYo天空岛].lnk", ["--mihoyo"])
     elif mode == "mihoyo":
-        createShortCut(get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [miHoYo天空岛].lnk", ["--mihoyo"])
+        createShortCut(
+            get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [miHoYo天空岛].lnk", ["--mihoyo"])
     elif mode == 'bilibili':
-        createShortCut(get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [BiliBili世界树].lnk", ["--bilibili"])
+        createShortCut(get_file(
+        ), f"{os.path.expanduser('~')}/Desktop/原神 [BiliBili世界树].lnk", ["--bilibili"])
     print("快捷方式创建成功")
-        
+
+def try_to_int(value: str):
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+def try_to_float(value: str):
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+def try_to_number(value: str):
+    float_type = try_to_float(value)
+    int_type = try_to_int(value)
+    if float_type == int_type:
+        return int_type
+    return float_type
 
 def main():
     title("鸭皇·游戏")
     print("《原神》游戏管理工具")
-    print(f"工具版本：{__version__}")
     print(f"文件所在目录: {os.path.dirname(os.path.abspath(__file__))}")
     print("by 鸭皇游戏")
     if "launcher_path" not in config.read() and "game_path" not in config.read():
@@ -336,17 +410,35 @@ def main():
     launcher_path = config.read("launcher_path")
     game_path = config.read("game_path")
     print(f"启动器: {launcher_path}\n游戏: {game_path}")
-    print(f"游戏版本:  {get_game_version(game_path)}")
-    print(f"米哈游SDK版本：{get_mihoyo_sdk_version(game_path)}")
-
+    print(f"原神服务器切换工具\n工具版本={__version__}\n游戏版本={get_game_version(game_path)}\nmiHoYo SDK版本={get_mihoyo_sdk_version(game_path)}")
     argv = read_argvs()
     if argv.mihoyo:
         change_mihoyo(game_path)
-        os.system(f"\"{launcher_path}\"")
+        start_launcher(launcher_path, game_path)
     elif argv.bilibili:
         print("准备启动")
         change_bilibili(game_path)
-        os.system(f"\"{launcher_path}\"")
+        start_launcher(launcher_path, game_path)
+    elif argv.config:
+        av_config = argv.config
+        assert len(av_config) == 2, "数据输入错误"
+        config_n = av_config[0]
+        config_v = av_config[1].lower()
+        number_type_v = try_to_number(config_n)
+        if config_n in list_of_argv_configs:
+            if "false" in config_v:
+                config.add(config_n, false)
+                print(f"{config_n}已成功设置为{config_v}")
+            elif "true" in config_v:
+                config.add(config_n, true)
+                print(f"{config_n}已成功设置为{config_v}")
+            elif number_type_v:
+                config.add(config_n, int_type_v)
+                print(f"{config_n}已成功设置为{config_v}")
+            else:
+                raise ConfigTypeError(f"数据类型错误 (value={config_v})")
+        else:
+            raise ConfigNotFoundError(f"设置项\"{config_n}\"不存在")
     elif argv.path:
         print("开始重新寻找游戏")
         set_path()
@@ -366,6 +458,6 @@ def main():
         command_mode(game_path, launcher_path)
         pause()
 
+
 if __name__ == "__main__":
     main()
-
