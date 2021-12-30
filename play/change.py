@@ -321,7 +321,7 @@ def change_mihoyo(game: str, link=False):
 
 def start_launcher(launcher_path, game_path):
     unity_run = config.read("no_launcher") == true if "no_launcher"  in config.read() else False
-    print(unity_run)
+    print("Unity启动:", unity_run)
     if unity_run:
         os.system(f"\"{game_path}\"")
     else:
