@@ -4,6 +4,7 @@ import wmi
 import argparse
 import requests
 import ctypes
+import time
 import win32com.client as client
 import configparser
 
@@ -58,12 +59,14 @@ class ConfigTypeError(Exception):
     pass
 
 
-def createShortCut(filename, lnkname, commands: list = None):
+def createShortCut(filename, lnkname, commands: list = None, icon: str = None):
     shortcut = shell.CreateShortCut(lnkname)
     shortcut.TargetPath = filename
     if commands:
         shortcut.Arguments = " ".join(commands)
     shortcut.WorkingDirectory = os.path.dirname(filename)
+    if icon:
+        shortcut.IconLocation = icon
     shortcut.save()
 
 
@@ -77,7 +80,6 @@ def pause(text=None, function=None):
     os.system("pause")
     if function:
         function()
-
 
 def search_dir(file_name, disks: list = None, assert_file=None):
     print()
@@ -319,8 +321,11 @@ def change_mihoyo(game: str, link=False):
     if link:
         create_links("mihoyo")
 
+def get_config_bool(n: str):
+    return config.read(n) == true if n  in config.read() else False
+
 def start_launcher(launcher_path, game_path):
-    unity_run = config.read("no_launcher") == true if "no_launcher"  in config.read() else False
+    unity_run = get_config_bool("no_launcher")
     print("Unity启动:", unity_run)
     if unity_run:
         os.system(f"\"{game_path}\"")
@@ -331,10 +336,9 @@ def start_launcher(launcher_path, game_path):
 
 
 def get_file():
-    if os.path.isfile(os.path.abspath(__file__)):
-        return os.path.abspath(__file__)
-    else:
-        return os.path.abspath(__file__).replace('.py', '.exe')
+    if sys.executable.split()[-1].lower() not in ("python.exe", "pythonw.exe", "py.exe", 'pyw.exe'):
+        return sys.executable
+    return __file__
 
 
 def command_mode(game_path, launcher_path):
@@ -361,18 +365,18 @@ def command_mode(game_path, launcher_path):
     commands_dict[res]()
 
 
-def create_links(mode="all"):
+def create_links(mode="all", game_path=None):
     if mode == "all":
         createShortCut(get_file(
-        ), f"{os.path.expanduser('~')}/Desktop/原神 [BiliBili世界树].lnk", ["--bilibili"])
+        ), f"{os.path.expanduser('~')}/Desktop/原神 [BiliBili世界树].lnk", ["--bilibili"], game_path)
         createShortCut(
-            get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [miHoYo天空岛].lnk", ["--mihoyo"])
+            get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [miHoYo天空岛].lnk", ["--mihoyo"], game_path)
     elif mode == "mihoyo":
         createShortCut(
-            get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [miHoYo天空岛].lnk", ["--mihoyo"])
+            get_file(), f"{os.path.expanduser('~')}/Desktop/原神 [miHoYo天空岛].lnk", ["--mihoyo"], game_path)
     elif mode == 'bilibili':
         createShortCut(get_file(
-        ), f"{os.path.expanduser('~')}/Desktop/原神 [BiliBili世界树].lnk", ["--bilibili"])
+        ), f"{os.path.expanduser('~')}/Desktop/原神 [BiliBili世界树].lnk", ["--bilibili"], game_path)
     print("快捷方式创建成功")
 
 def try_to_int(value: str):
@@ -453,7 +457,7 @@ def main():
             print("指令错误")
             pause()
     elif argv.link:
-        create_links()
+        create_links(game_path=game_path)
     else:
         command_mode(game_path, launcher_path)
         pause()
