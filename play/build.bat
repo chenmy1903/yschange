@@ -9,4 +9,5 @@ rd /s/q .\build
 rd /s/q .\__pycache__
 echo Done
 pause
+cls
 exit
