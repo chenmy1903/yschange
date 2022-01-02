@@ -45,9 +45,9 @@ class ChackNetwork(QThread):
 
     def run(self):
         try:
-            requests.get("https://webstatic.mihoyo.com")
-        except:
-            QMessageBox.critical(None, "错误", "无网络连接或DNS错误")
+            requests.get("https://webstatic.mihoyo.com", verify=False)
+        except Exception as e:
+            QMessageBox.critical(None, str(type(e)), "请连接网络")
             sys.exit()
         self.done.emit()
 
@@ -60,7 +60,6 @@ class Web(QWebEngineView):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.show()
-        self.cookie_store = self.page().profile().cookieStore()
         self.load(QtCore.QUrl("https://webstatic.mihoyo.com/app/ys-map-cn/index.html"))
 
 
