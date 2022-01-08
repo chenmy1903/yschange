@@ -293,7 +293,7 @@ def move_sdk(game: str, load=False):
     """PCGameSDK.dll生成工具
 将change.exe的文件解压到%TEMP%里然后读取，然后复制到游戏目录里
 tip: 这是被pyinstaller打包过后才行，pyinstaller生成的程序其实就是一个压缩文件，每次运行都会把文件解压到%TEMP%里执行
-否则会抛出FileNotFoundError，因为这个dll太大了，所以可以去https://github.com/FastChen/The-Key-of-Teyvat/Resources/PCGameSDK.dll下载
+否则会抛出FileNotFoundError，这个dll太大了，所以可以去https://github.com/FastChen/The-Key-of-Teyvat/blob/main/The-Key-of-Teyvat/Resources/PCGameSDK.dll 下载
 game: 游戏文件（YuanShen.exe）
 load: 是否为加载模式
     """
