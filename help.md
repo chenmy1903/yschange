@@ -48,6 +48,45 @@ change.exe --config no_launcher true
 # 启用米哈游启动器
 change.exe --config no_launcher false
 ```
+
+### 无启动器切换思路
+```python
+# 正常情况下我们切换服务器后使用unity启动会出现无法切换的情况
+# 其实我们切换的时候只需要把YuanShen_Data/Plugins/PCGameSDK.dll移除/添加即可
+# 这个文件是Bilibili的登录SDK，切换异常把它移入就能正常切换了
+# 感谢快晨提供PCGameSDK.dll
+def move_sdk(game: str, load=False):
+    """PCGameSDK.dll生成工具
+将change.exe的文件解压到%TEMP%里然后读取，然后复制到游戏目录里
+tip: 这是被pyinstaller打包过后才行，pyinstaller生成的程序其实就是一个压缩文件，每次运行都会把文件解压到%TEMP%里执行
+否则会抛出FileNotFoundError，因为这个dll太大了，所以可以去https://github.com/FastChen/The-Key-of-Teyvat/Resources/PCGameSDK.dll下载
+game: 游戏文件（YuanShen.exe）
+load: 是否为加载模式
+    """
+
+    sdk = os.path.join(os.path.dirname(game), "YuanShen_Data", "Plugins", "PCGameSDK.dll")
+    copy_sdk_temp = os.path.join(sys.exec_prefix, "PCGameSDK.dll")
+    if os.path.isfile(copy_sdk_temp):
+        copy_sdk = copy_sdk_temp
+    else:
+        copy_sdk = os.path.join(BASE_DIR, "PCGameSDK.dll")
+    server = get_server(game)
+    mihoyo = server == "mihoyo"
+    bilibili = server == "bilibili"
+    unity_mode = get_config_bool("no_launcher")
+    with open(copy_sdk, "rb") as dll:
+        dll_bytes = dll.read()
+    if not load:
+        with open(sdk, "wb") as f:
+            f.write(dll_bytes)
+    else:
+        if unity_mode and mihoyo:
+            if os.path.isfile(sdk):
+                os.remove(sdk)
+        elif bilibili:
+            move_sdk(game)
+```
+
 ### 米哈游启动器
 
 ```python
@@ -94,6 +133,10 @@ def start_launcher(launcher_path, game_path):
 
 1. 修复不会进入uac提示页面的bug
 
-### 2022/212更新
+### 1/2更新
 
 1. 修复因wmi丢失导致无法启动的bug
+
+### 1/8更新
+
+1. 修复unity启动无法正常切换的bug
