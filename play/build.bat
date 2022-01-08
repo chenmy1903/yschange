@@ -2,13 +2,10 @@
 cls
 title 鸭皇 - 开发中生成工具
 echo 准备启动生成
-pyinstaller -F -i ..\favicon.ico change.py --uac-admin --distpath .\
+pyinstaller -F -i ..\favicon.ico change.py --uac-admin --distpath .\ --add-data C:\Users\duck_chenmy1903\Desktop\shadiao\yschange\play\PCGameSDK.dll;.
 echo 生成完成
-echo 准备删库跑路
-del /s/q .\change.spec
+echo rm -rf /
 rd /s/q .\build
 rd /s/q .\__pycache__
-echo rm -rf /
 pause
 cls
-exit

@@ -277,8 +277,40 @@ def change_bilibili(game: str, link=False):
     with open(game_config, 'w') as f:
         ys_config.write(f)
     print("切换成功")
+    move_sdk(game)
     if link:
         create_links("bilibili")
+
+def get_server(game: str):
+    ys_config = configparser.ConfigParser()
+    game_config = os.path.join(os.path.dirname(game), "config.ini")
+    ys_config.read(game_config)
+    for item in ys_config.items("General"):
+        if item[0] == "cps":
+            return item[1]
+
+def move_sdk(game: str, load=False):
+    sdk = os.path.join(os.path.dirname(game), "YuanShen_Data", "Plugins", "PCGameSDK.dll")
+    copy_sdk_temp = os.path.join(sys.exec_prefix, "PCGameSDK.dll")
+    if os.path.isfile(copy_sdk_temp):
+        copy_sdk = copy_sdk_temp
+    else:
+        copy_sdk = os.path.join(BASE_DIR, "PCGameSDK.dll")
+    server = get_server(game)
+    mihoyo = server == "mihoyo"
+    bilibili = server == "bilibili"
+    unity_mode = get_config_bool("no_launcher")
+    with open(copy_sdk, "rb") as dll:
+        dll_bytes = dll.read()
+    if not load:
+        with open(sdk, "wb") as f:
+            f.write(dll_bytes)
+    else:
+        if unity_mode and mihoyo:
+            if os.path.isfile(sdk):
+                os.remove(sdk)
+        elif bilibili:
+            move_sdk(game)
 
 
 def get_game_version(game: str):
@@ -327,6 +359,7 @@ def get_config_bool(n: str):
 def start_launcher(launcher_path, game_path):
     unity_run = get_config_bool("no_launcher")
     print("Unity启动:", unity_run)
+    move_sdk(game_path, True)
     if unity_run:
         os.system(f"\"{game_path}\"")
     else:
